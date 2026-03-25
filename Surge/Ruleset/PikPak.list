@@ -1,5 +1,5 @@
 # 规则名称: PikPak
-# 规则统计: 7
+# 规则统计: 8
 
 DOMAIN-SUFFIX,dlandroid.rcv.sandai.net
 DOMAIN-SUFFIX,hub5idx.v6.shub.sandai.net
@@ -8,3 +8,4 @@ DOMAIN-SUFFIX,hub5pnc.sandai.net
 DOMAIN-SUFFIX,hub5pr.v6.phub.sandai.net
 DOMAIN-SUFFIX,hubciddata.sandai.net
 DOMAIN-KEYWORD,mypikpak
+DOMAIN-KEYWORD,pikpak
