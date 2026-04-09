@@ -1,4 +1,4 @@
 # 规则名称: Krak
 # 规则统计: 1
 
-DOMAIN-KEYWORD,krak
+AND,((NOT,((DOMAIN-KEYWORD,gitkraken))),(DOMAIN-KEYWORD,krak))
