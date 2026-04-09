@@ -1,5 +1,15 @@
 # 规则名称: ChinaMax
-# 规则统计: 117997
+# 规则统计: 118003
+
+# 机场订阅
+DOMAIN,api-huacloud.dev
+DOMAIN,huaikhwang.central-world.org
+DOMAIN,link01.nobodys.uk
+DOMAIN,rama991.siamparagon.org
+DOMAIN,villa.parkson-market.org
+
+# nas
+DOMAIN,nas.kerwin.cloud
 
 DOMAIN,1-fss24-s0.streamhoster.com
 DOMAIN,14033.live.streamtheworld.com
