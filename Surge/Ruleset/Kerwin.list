@@ -1,4 +1,4 @@
 # 规则名称: Kerwin
 # 规则统计: 1
 
-DOMAIN-KEYWORD,kerwin
+AND,((NOT,((DOMAIN,nas.kerwin.cloud))),(DOMAIN-KEYWORD,kerwin))
