@@ -1,5 +1,5 @@
 # 规则名称: Unbreak
-# 规则统计: 50
+# 规则统计: 59
 
 HOST,ad.10010.com,Unbreak
 HOST,alt1-mtalk.google.com,Unbreak
@@ -51,3 +51,14 @@ HOST-SUFFIX,staticfile.org,Unbreak
 HOST-SUFFIX,tracking-protection.cdn.mozilla.net,Unbreak
 HOST-SUFFIX,upaiyun.com,Unbreak
 HOST-KEYWORD,wb_ad,Unbreak
+# 机场订阅
+HOST,api-huacloud.dev,Unbreak
+HOST,huaikhwang.central-world.org,Unbreak
+HOST,link01.nobodys.uk,Unbreak
+HOST,rama991.siamparagon.org,Unbreak
+HOST,villa.parkson-market.org,Unbreak
+HOST-KEYWORD,flowercloud,Unbreak
+HOST-KEYWORD,tagweb,Unbreak
+HOST-KEYWORD,tagss13,Unbreak
+# nas
+HOST,nas.kerwin.cloud,Unbreak

@@ -1,5 +1,5 @@
 # 规则名称: Unbreak
-# 规则统计: 50
+# 规则统计: 59
 
 DOMAIN,ad.10010.com
 DOMAIN,alt1-mtalk.google.com
@@ -51,3 +51,14 @@ DOMAIN-SUFFIX,staticfile.org
 DOMAIN-SUFFIX,tracking-protection.cdn.mozilla.net
 DOMAIN-SUFFIX,upaiyun.com
 DOMAIN-KEYWORD,wb_ad
+# 机场订阅
+DOMAIN,api-huacloud.dev
+DOMAIN,huaikhwang.central-world.org
+DOMAIN,link01.nobodys.uk
+DOMAIN,rama991.siamparagon.org
+DOMAIN,villa.parkson-market.org
+DOMAIN-KEYWORD,flowercloud
+DOMAIN-KEYWORD,tagweb
+DOMAIN-KEYWORD,tagss13
+# nas
+DOMAIN,nas.kerwin.cloud
