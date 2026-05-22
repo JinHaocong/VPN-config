@@ -1,5 +1,5 @@
 # 规则名称: Unbreak
-# 规则统计: 59
+# 规则统计: 60
 
 payload:
   - DOMAIN,ad.10010.com
@@ -59,6 +59,7 @@ payload:
   - DOMAIN,rama991.siamparagon.org
   - DOMAIN,villa.parkson-market.org
   - DOMAIN-KEYWORD,flowercloud
+  - DOMAIN-KEYWORD,huacloud
   - DOMAIN-KEYWORD,tagweb
   - DOMAIN-KEYWORD,tagss13
   # nas

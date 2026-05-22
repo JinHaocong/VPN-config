@@ -1,5 +1,5 @@
 # 规则名称: Unbreak
-# 规则统计: 59
+# 规则统计: 60
 
 HOST,ad.10010.com,Unbreak
 HOST,alt1-mtalk.google.com,Unbreak
@@ -58,6 +58,7 @@ HOST,link01.nobodys.uk,Unbreak
 HOST,rama991.siamparagon.org,Unbreak
 HOST,villa.parkson-market.org,Unbreak
 HOST-KEYWORD,flowercloud,Unbreak
+HOST-KEYWORD,huacloud,Unbreak
 HOST-KEYWORD,tagweb,Unbreak
 HOST-KEYWORD,tagss13,Unbreak
 # nas
