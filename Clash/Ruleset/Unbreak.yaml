@@ -1,5 +1,5 @@
 # 规则名称: Unbreak
-# 规则统计: 60
+# 规则统计: 61
 
 payload:
   - DOMAIN,ad.10010.com
@@ -52,6 +52,7 @@ payload:
   - DOMAIN-SUFFIX,tracking-protection.cdn.mozilla.net
   - DOMAIN-SUFFIX,upaiyun.com
   - DOMAIN-KEYWORD,wb_ad
+  - DOMAIN,challenges.cloudflare.com
   # 机场订阅
   - DOMAIN,api-huacloud.dev
   - DOMAIN,huaikhwang.central-world.org
