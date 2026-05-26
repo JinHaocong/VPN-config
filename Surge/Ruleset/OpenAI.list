@@ -1,6 +1,7 @@
 # 规则名称: OpenAI
-# 规则统计: 19
+# 规则统计: 20
 
+DOMAIN-KEYWORD,gitkraken
 DOMAIN-SUFFIX,api.statsig.com
 DOMAIN-SUFFIX,auth0.com
 DOMAIN-SUFFIX,challenges.cloudflare.com

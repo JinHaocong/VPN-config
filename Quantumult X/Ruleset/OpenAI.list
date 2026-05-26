@@ -1,6 +1,7 @@
 # 规则名称: OpenAI
-# 规则统计: 19
+# 规则统计: 20
 
+HOST-KEYWORD,gitkraken,OpenAI
 HOST-SUFFIX,api.statsig.com,OpenAI
 HOST-SUFFIX,auth0.com,OpenAI
 HOST-SUFFIX,challenges.cloudflare.com,OpenAI
