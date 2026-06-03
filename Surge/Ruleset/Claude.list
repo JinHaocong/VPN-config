@@ -1,6 +1,7 @@
 # 规则名称: Claude
-# 规则统计: 3
+# 规则统计: 4
 
 DOMAIN,cdn.usefathom.com
 DOMAIN-SUFFIX,anthropic.com
 DOMAIN-SUFFIX,claude.ai
+DOMAIN-SUFFIX,claude.com
