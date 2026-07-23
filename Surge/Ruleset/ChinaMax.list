@@ -1,5 +1,5 @@
 # 规则名称: ChinaMax
-# 规则统计: 117997
+# 规则统计: 117999
 
 DOMAIN,1-fss24-s0.streamhoster.com
 DOMAIN,14033.live.streamtheworld.com
@@ -97784,6 +97784,7 @@ DOMAIN-KEYWORD,qiyi
 DOMAIN-KEYWORD,stripe
 DOMAIN-KEYWORD,taobao
 DOMAIN-KEYWORD,weibo
+DOMAIN-KEYWORD,hzmeipingmi
 DOMAIN-SUFFIX,91yunebao.com
 IP-CIDR,0.0.0.0/32,no-resolve
 IP-CIDR,1.0.1.0/24,no-resolve
