@@ -55,6 +55,7 @@ payload:
   # 机场订阅
   - DOMAIN,api-huacloud.dev
   - DOMAIN,huaikhwang.central-world.org
+  - DOMAIN,ratchada.terminal69.win
   - DOMAIN,link01.nobodys.uk
   - DOMAIN,rama991.siamparagon.org
   - DOMAIN,villa.parkson-market.org
