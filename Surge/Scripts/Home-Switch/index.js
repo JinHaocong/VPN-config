@@ -1,74 +1,74 @@
 /**
- * homeSwitch | Surge Home Control
- * 手动点击切换面板的刷新按钮，原子性尽可能地同步 Home 与 homeLan。
- * 无 cron；没有自动切换；Mac / iOS 共用。
- * 必须先安装名为 homeLan 的远程模块。
+ * HomeSwitch | Surge Home Control
+ * 支持 Surge iOS / Mac；通过 HTTP API 获取和切换隐藏的 Home 策略。
+ * 仅点击 HomeSwitchPanel 刷新按钮时才会切换。
  */
 
 const groupName = 'Home';
 const moduleName = 'homeLan';
+const panelName = 'HomeSwitchPanel';
 const storeKey = 'homeSwitchLast';
 
-function currentPolicy() {
-  const details = $surge.selectGroupDetails();
-  return details && details.decisions ? details.decisions[groupName] : undefined;
-}
-
-function show(title, lines, color) {
+function render(title, content, color) {
   $done({
     title,
-    content: lines.join('\n'),
+    content: content.join('\n'),
     icon: 'house.fill',
     'icon-color': color || '#3B82F6',
   });
 }
 
-function isAvailable(result) {
-  return (
-    result &&
-    Array.isArray(result.available) &&
-    Array.isArray(result.enabled) &&
-    (result.available.includes(moduleName) || result.enabled.includes(moduleName))
-  );
+function getPolicy(callback) {
+  $httpAPI('GET', '/v1/policy_groups/select', { group_name: groupName }, (result) => {
+    const policy = result && result.policy;
+    callback(policy === 'Tailscale' || policy === 'Subscribe' ? policy : null);
+  });
 }
 
-const fromPolicy = currentPolicy();
+function getModule(callback) {
+  $httpAPI('GET', '/v1/modules', {}, (result) => {
+    if (!result || !Array.isArray(result.enabled) || !Array.isArray(result.available)) {
+      callback(null);
+      return;
+    }
+    const installed = result.available.includes(moduleName) || result.enabled.includes(moduleName);
+    callback(installed ? result.enabled.includes(moduleName) : null);
+  });
+}
 
-if (!['Tailscale', 'Subscribe'].includes(fromPolicy)) {
-  show(
-    'Home · 配置异常',
-    ['找不到 Home 当前策略，或选项不是 Tailscale / Subscribe。', '请检查 [Proxy Group]。'],
-    '#EF4444'
-  );
-} else {
-  $httpAPI('GET', '/v1/modules', {}, (modules) => {
-    if (!isAvailable(modules)) {
-      show(
+getPolicy((fromPolicy) => {
+  if (!fromPolicy) {
+    render(
+      'Home · 读取失败',
+      ['无法通过 Surge HTTP API 读取 Home 当前策略。', '请确认当前配置中存在 Home 策略组。'],
+      '#EF4444'
+    );
+    return;
+  }
+
+  getModule((initialEnabled) => {
+    if (initialEnabled === null) {
+      render(
         'Home · 模块未就绪',
-        [
-          `当前线路：${fromPolicy}`,
-          '未找到 homeLan 模块，已停止切换。',
-          '请确认模块已安装且名称为 homeLan。',
-        ],
+        [`当前线路：${fromPolicy}`, 'homeLan 不存在或模块状态读取失败。', '本次没有修改 Home。'],
         '#EF4444'
       );
       return;
     }
 
-    const isEnabled = modules.enabled.includes(moduleName);
-    const expectedEnabled = fromPolicy === 'Tailscale';
-
-    // 任何自动加载或脚本编辑器测试，只显示状态，不改变选项。
-    if ($trigger !== 'button' || !$input || $input.panelName !== 'HomeSwitchPanel') {
-      show(
+    const isButton = typeof $trigger !== 'undefined' && $trigger === 'button';
+    const fromPanel = typeof $input !== 'undefined' && $input && $input.panelName === panelName;
+    if (!isButton || !fromPanel) {
+      const synced = initialEnabled === (fromPolicy === 'Tailscale');
+      render(
         'Home · 线路控制',
         [
           `当前：${fromPolicy === 'Tailscale' ? 'Tailscale · 家庭内网' : 'Subscribe · Cloudflare'}`,
-          `homeLan：${isEnabled ? '已开启' : '已关闭'}`,
-          `配置检查：${isEnabled === expectedEnabled ? '正常' : '⚠️ 不一致'}`,
-          '点击此面板的刷新按钮切换线路。',
+          `homeLan：${initialEnabled ? '已开启' : '已关闭'}`,
+          `配置一致性：${synced ? '✓ 正常' : '⚠️ 不一致'}`,
+          '点击 Home Control 面板的刷新按钮切换线路。',
         ],
-        isEnabled === expectedEnabled ? '#2563EB' : '#F59E0B'
+        synced ? '#2563EB' : '#F59E0B'
       );
       return;
     }
@@ -76,67 +76,83 @@ if (!['Tailscale', 'Subscribe'].includes(fromPolicy)) {
     const toPolicy = fromPolicy === 'Tailscale' ? 'Subscribe' : 'Tailscale';
     const shouldEnable = toPolicy === 'Tailscale';
 
-    // 先修改策略，模块启停为最后一步：某些版本的模块应用会重载配置。
-    const switched = $surge.setSelectGroupPolicy(groupName, toPolicy);
-    if (!switched) {
-      show(
-        'Home · 切换失败',
-        [`无法将 Home 切换到 ${toPolicy}。`, '没有请求修改模块，请检查脚本日志。'],
-        '#EF4444'
-      );
-      return;
-    }
+    // 使用跨平台 HTTP API，避免部分版本的 selectGroupDetails().decisions 不包含隐藏策略组。
+    $httpAPI(
+      'POST',
+      '/v1/policy_groups/select',
+      {
+        group_name: groupName,
+        policy: toPolicy,
+      },
+      (policyResponse) => {
+        // 先确认策略更新，再开关模块，避免第一次写入失败却修改了模块。
+        getPolicy((updatedPolicy) => {
+          if (updatedPolicy !== toPolicy) {
+            console.log('Home switch response: ' + JSON.stringify(policyResponse));
+            render(
+              'Home · 切换失败',
+              [
+                `Home 仍为 ${updatedPolicy || '未知'}`,
+                'homeLan 未修改。',
+                '请查看 HomeSwitch 的脚本日志。',
+              ],
+              '#EF4444'
+            );
+            return;
+          }
 
-    $httpAPI('POST', '/v1/modules', { [moduleName]: shouldEnable }, (response) => {
-      $httpAPI('GET', '/v1/modules', {}, (checked) => {
-        const actualPolicy = currentPolicy();
-        const actualEnabled =
-          checked && Array.isArray(checked.enabled) ? checked.enabled.includes(moduleName) : null;
-        const success = actualPolicy === toPolicy && actualEnabled === shouldEnable;
-        const at = new Date().toLocaleString('zh-CN', { hour12: false });
+          function verify() {
+            getPolicy((actualPolicy) => {
+              getModule((actualEnabled) => {
+                const success = actualPolicy === toPolicy && actualEnabled === shouldEnable;
+                const at = new Date().toLocaleString('zh-CN', { hour12: false });
+                $persistentStore.write(
+                  JSON.stringify({
+                    time: at,
+                    from: fromPolicy,
+                    to: toPolicy,
+                    success,
+                  }),
+                  storeKey
+                );
+                if (success) {
+                  render(
+                    'Home · 切换成功',
+                    [
+                      `${fromPolicy} → ${toPolicy}`,
+                      `homeLan：${shouldEnable ? '已开启' : '已关闭'}`,
+                      toPolicy === 'Tailscale'
+                        ? '目标：家庭内网 · 192.168.31.209'
+                        : '目标：Cloudflare Tunnel · 公网',
+                      '已有连接可能需要重新打开。',
+                    ],
+                    toPolicy === 'Tailscale' ? '#16A34A' : '#2563EB'
+                  );
+                } else {
+                  render(
+                    'Home · 状态未同步',
+                    [
+                      `当前线路：${actualPolicy || '未知'}`,
+                      `homeLan：${actualEnabled === null ? '读取失败' : actualEnabled ? '已开启' : '已关闭'}`,
+                      '请查看 HomeStatus，必要时手动恢复模块状态。',
+                    ],
+                    '#EF4444'
+                  );
+                }
+              });
+            });
+          }
 
-        if (success) {
-          $persistentStore.write(
-            JSON.stringify({
-              time: at,
-              from: fromPolicy,
-              to: toPolicy,
-              success: true,
-            }),
-            storeKey
-          );
-          show(
-            'Home · 切换成功',
-            [
-              `${fromPolicy} → ${toPolicy}`,
-              `homeLan：${shouldEnable ? '已开启' : '已关闭'}`,
-              `${toPolicy === 'Tailscale' ? '目标：192.168.31.209（内网）' : '目标：Cloudflare Tunnel（公网）'}`,
-              '已有连接可能需要重新打开。',
-            ],
-            toPolicy === 'Tailscale' ? '#16A34A' : '#2563EB'
-          );
-        } else {
-          $persistentStore.write(
-            JSON.stringify({
-              time: at,
-              from: fromPolicy,
-              to: toPolicy,
-              success: false,
-            }),
-            storeKey
-          );
-          console.log('homeSwitch module response: ' + JSON.stringify(response));
-          show(
-            'Home · 需要检查',
-            [
-              `当前策略：${actualPolicy || '未知'}`,
-              `模块状态：${actualEnabled === null ? '读取失败' : actualEnabled ? '开启' : '关闭'}`,
-              '策略与模块可能不同步，请到 homeStatus 查看。',
-            ],
-            '#EF4444'
-          );
-        }
-      });
-    });
+          if (initialEnabled === shouldEnable) {
+            verify();
+          } else {
+            $httpAPI('POST', '/v1/modules', { [moduleName]: shouldEnable }, (moduleResponse) => {
+              console.log('homeLan module response: ' + JSON.stringify(moduleResponse));
+              verify();
+            });
+          }
+        });
+      }
+    );
   });
-}
+});
