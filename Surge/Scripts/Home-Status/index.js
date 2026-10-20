@@ -1,133 +1,184 @@
 /**
- * HomeStatus v2 | Surge Home Control
- * iOS / macOS: 展示 Home、homeLan、最近切换与原生 Tailscale 探测结果。
- * 仅查询与探测，不修改策略组或模块。
- * 测试的是 Surge 自动选中的 Peer，可能不是 UCG-Fiber。
+ * HomeStatus v3 | Home Control
+ * Read-only diagnostic panel for macOS and iOS Surge.
+ * Runs native Tailscale peer probe; the selected peer may not be UCG-Fiber.
+ * Optional argument: healthUrl=https://your-service.example/health
+ * HTTP status is reported separately from native Tailscale RTT.
  */
 
 const groupName = 'Home';
 const moduleName = 'homeLan';
-const policyName = 'Tailscale';
+const tailscalePolicy = 'Tailscale';
 const storeKey = 'homeSwitchLast';
+const ink = {
+  green: '#16A34A',
+  blue: '#3B82F6',
+  amber: '#D97706',
+  red: '#DC2626',
+  gray: '#64748B',
+};
+let finished = false;
 
-function displayPeer(value) {
-  if (typeof value !== 'string' || !value.trim()) return '未返回';
-  const normalized = value.trim().replace(/\.$/, '');
-  // 保留短主机名，避免在面板里显示很长的 tailnet 域名。
-  return normalized.split('.')[0] || normalized;
+function render(title, lines, color, icon) {
+  if (finished) return;
+  finished = true;
+  $done({ title, content: lines.join('\n'), icon, 'icon-color': color });
 }
 
-function parseProbe(result) {
-  const data = result && result[policyName];
-  if (!data || typeof data !== 'object') {
-    return { available: false, detail: '无有效测试结果' };
+function shortPeer(value) {
+  if (typeof value !== 'string' || !value.trim()) return '未知';
+  return value.trim().replace(/\.$/, '').split('.')[0] || '未知';
+}
+
+function parseProbe(value) {
+  const item = value && value[tailscalePolicy];
+  if (!item || typeof item !== 'object') {
+    return { ok: false, path: '', latency: null, peer: '未知', error: '接口没有返回有效测试结果' };
   }
-
-  const rawPath = typeof data.path === 'string' ? data.path.toLowerCase() : '';
-  const path =
-    rawPath === 'direct'
-      ? '直连 Direct'
-      : rawPath === 'relay'
-        ? '中继 Relay'
-        : rawPath === 'derp'
-          ? '中继 DERP'
-          : rawPath
-            ? `其他（${rawPath}）`
-            : '路径未知';
-
-  const receive =
-    typeof data.receive === 'number' && Number.isFinite(data.receive) && data.receive >= 0
-      ? `${Math.round(data.receive)} ms`
-      : '未返回';
-  const peer = displayPeer(data.peer);
-  const err = data.error || data.message;
-
+  const path = typeof item.path === 'string' ? item.path.toLowerCase() : '';
+  const latency =
+    typeof item.receive === 'number' && Number.isFinite(item.receive) && item.receive >= 0
+      ? Math.round(item.receive)
+      : null;
+  const message = item.error || item.message;
   return {
-    available: true,
+    ok: path !== '' || latency !== null,
     path,
-    rawPath,
-    receive,
-    peer,
-    error: err ? String(err).slice(0, 100) : null,
+    latency,
+    peer: shortPeer(item.peer),
+    error: message ? String(message).slice(0, 90) : '',
   };
 }
 
-function getLastSwitch() {
-  const raw = $persistentStore.read(storeKey);
-  if (!raw) return '暂无记录';
+function lastSwitch() {
+  const data = $persistentStore.read(storeKey);
+  if (!data) return '暂无记录';
   try {
-    const record = JSON.parse(raw);
-    return `${record.time || '?'} · ${record.to || '?'}${record.success ? '' : '（需检查）'}`;
+    const last = JSON.parse(data);
+    const status =
+      last.status === 'rolled_back'
+        ? '已回滚'
+        : last.status === 'rollback_failed'
+          ? '恢复失败'
+          : last.success
+            ? '成功'
+            : '需检查';
+    return `${last.time || '--'} · ${status}`;
   } catch (_) {
-    return '记录格式异常';
+    return '记录不可读取';
   }
 }
 
-function finish(policy, installed, enabled, probe) {
-  const validPolicy = policy === 'Tailscale' || policy === 'Subscribe';
-  const synced = validPolicy && installed && enabled === (policy === 'Tailscale');
-  const isTailscale = policy === 'Tailscale';
-  const selection = isTailscale
+function getHealthUrl() {
+  const argument = typeof $argument === 'string' ? $argument : '';
+  const found = argument.match(/(?:^|&)healthUrl=([^&]+)/);
+  if (!found) return null;
+  let url;
+  try {
+    url = decodeURIComponent(found[1]);
+  } catch (_) {
+    return null;
+  }
+  return /^https?:\/\/[^\s]+$/i.test(url) ? url : null;
+}
+
+function checkHealth(url, callback) {
+  if (!url) {
+    callback(null);
+    return;
+  }
+  const started = Date.now();
+  $httpClient.get(
+    { url, policy: groupName, timeout: 5, 'auto-redirect': false },
+    (error, response) => {
+      const ms = Date.now() - started;
+      const code = response && response.status;
+      const reached = !error && typeof code === 'number' && code >= 200 && code < 500;
+      callback({ reached, code, ms, error: error ? String(error).slice(0, 80) : '' });
+    }
+  );
+}
+
+function draw(policy, enabled, probe, health) {
+  const valid = policy === 'Tailscale' || policy === 'Subscribe';
+  const synced = valid && enabled !== null && enabled === (policy === 'Tailscale');
+  const isTs = policy === 'Tailscale';
+  const mode = isTs
     ? 'Tailscale · 家庭内网'
     : policy === 'Subscribe'
       ? 'Subscribe · Cloudflare'
-      : '读取失败';
+      : '未知';
+  const path =
+    probe.path === 'direct'
+      ? '直连 Direct'
+      : probe.path === 'relay'
+        ? '中继 Relay'
+        : probe.path === 'derp'
+          ? '中继 DERP'
+          : probe.path
+            ? `其他 ${probe.path}`
+            : '未知';
   const lines = [
-    `当前线路：${selection}`,
-    `homeLan：${enabled === null ? '未知/未安装' : enabled ? '已开启' : '已关闭'}`,
-    `配置一致性：${synced ? '✓ 正常' : '⚠ 请检查'}`,
+    `${synced ? '●' : '▲'} ${mode}`,
     '━━━━━━━━━━━━━━',
+    `模块      ${enabled === null ? '未知 / 未安装' : enabled ? 'homeLan 已开启' : 'homeLan 已关闭'}`,
+    `配置      ${synced ? '✓ 策略与模块一致' : '⚠ 策略与模块不一致'}`,
+    '━━━━━━━━━━━━━━',
+    '▸ TAILSCALE · 原生探测',
   ];
-
-  if (probe.available) {
-    lines.push(`Tailscale：${probe.path}`);
-    lines.push(`探测延迟：${probe.receive}`);
-    lines.push(`测试 Peer：${probe.peer}`);
-    if (probe.error) lines.push(`探测消息：${probe.error}`);
-    if (!isTailscale) lines.push('注：Home 当前未选用 Tailscale');
-    lines.push('说明：原生探测 RTT，非 HTTP 测速');
+  if (probe.ok) {
+    lines.push(`连接      ${path}`);
+    lines.push(`延迟      ${probe.latency === null ? '未返回' : `${probe.latency} ms`}`);
+    lines.push(`Peer      ${probe.peer}`);
+    if (probe.error) lines.push(`备注      ${probe.error}`);
   } else {
-    lines.push('Tailscale 探测：未取得');
-    lines.push(`原因：${probe.detail || '未知'}`);
+    lines.push(`状态      暂不可用`);
+    lines.push(`原因      ${probe.error}`);
   }
-
+  if (!isTs) lines.push('提示      当前未使用 Tailscale 出站');
+  lines.push('注：测试 Peer 由 Surge 选择，非指定网关');
+  if (health !== null) {
+    lines.push('━━━━━━━━━━━━━━');
+    lines.push('▸ HOME · 服务检测');
+    lines.push(
+      `HTTP      ${health.reached ? '✓ 可连接' : '✕ 连接失败'}${health.code ? ` (${health.code})` : ''}`
+    );
+    lines.push(`响应      ${health.ms} ms · 非 Peer RTT`);
+  }
   lines.push('━━━━━━━━━━━━━━');
-  lines.push(`上次切换：${getLastSwitch()}`);
+  lines.push(`上次切换  ${lastSwitch()}`);
 
   const color = !synced
-    ? '#F59E0B'
-    : !probe.available
-      ? '#64748B'
-      : probe.rawPath === 'direct'
-        ? '#16A34A'
-        : probe.rawPath === 'relay' || probe.rawPath === 'derp'
-          ? '#F59E0B'
-          : '#2563EB';
-
-  $done({
-    title: 'Home · 网络状态',
-    content: lines.join('\n'),
-    icon: 'network',
-    'icon-color': color,
-  });
+    ? ink.red
+    : health && !health.reached
+      ? ink.amber
+      : !probe.ok
+        ? ink.gray
+        : isTs && probe.path === 'direct'
+          ? ink.green
+          : isTs && (probe.path === 'relay' || probe.path === 'derp')
+            ? ink.amber
+            : ink.blue;
+  const icon = !synced
+    ? 'exclamationmark.triangle.fill'
+    : isTs && probe.path === 'direct'
+      ? 'checkmark.shield.fill'
+      : isTs
+        ? 'network'
+        : 'cloud.fill';
+  render('Home · 网络状态', lines, color, icon);
 }
 
-$httpAPI('GET', '/v1/policy_groups/select', { group_name: groupName }, (groupResult) => {
-  const policy = groupResult && groupResult.policy;
-
-  $httpAPI('GET', '/v1/modules', {}, (moduleResult) => {
-    const enabledNames = moduleResult && moduleResult.enabled;
-    const availableNames = moduleResult && moduleResult.available;
-    const known = Array.isArray(enabledNames) && Array.isArray(availableNames);
-    const installed = Boolean(
-      known && (enabledNames.includes(moduleName) || availableNames.includes(moduleName))
-    );
-    const enabled = installed ? enabledNames.includes(moduleName) : null;
-
-    // Surge Tailscale 无 exit node、无显式 test-url 时，这将使用原生 Discovery Ping。
-    // 探测自动选择 Peer，不保证每次都测量 UCG-Fiber。
-    $httpAPI('POST', '/v1/policies/test', { policy_names: [policyName] }, (testResult) => {
-      finish(policy, installed, enabled, parseProbe(testResult));
+$httpAPI('GET', '/v1/policy_groups/select', { group_name: groupName }, (result) => {
+  const policy = result && result.policy;
+  $httpAPI('GET', '/v1/modules', {}, (modules) => {
+    const known = modules && Array.isArray(modules.enabled) && Array.isArray(modules.available);
+    const installed =
+      known && (modules.available.includes(moduleName) || modules.enabled.includes(moduleName));
+    const enabled = installed ? modules.enabled.includes(moduleName) : null;
+    $httpAPI('POST', '/v1/policies/test', { policy_names: [tailscalePolicy] }, (resultTest) => {
+      const probe = parseProbe(resultTest);
+      checkHealth(getHealthUrl(), (health) => draw(policy, enabled, probe, health));
     });
   });
 });
