@@ -1,20 +1,15 @@
 /**
  * Home DNS
- * 根据 Surge Home 策略动态解析 DNS
- *
- * Home = Tailscale  → 内网 IP
- * Home = Subscribe  → 公网 DNS（Cloudflare）
- *
- * 内网 IP 由 Surge argument 传入
+ * Tailscale → NAS 内网 IP
+ * Subscribe → Cloudflare 公网 DNS
  */
 
-const selected = $surge.selectGroupDetails().decisions['Home'];
-const address = $argument?.trim();
+const selectedPolicy = $surge.selectGroupDetails().decisions.Home;
+const homeAddress = ($argument || '').trim();
 
-if (selected === 'Tailscale' && address) {
+if (selectedPolicy === 'Tailscale' && homeAddress) {
   $done({
-    address,
-    ttl: 5,
+    address: homeAddress,
   });
 } else {
   $done({});
