@@ -1,0 +1,11 @@
+#!name=homeLan
+#!desc=Home 选择 Tailscale 时启用内网静态 Host 映射；选择 Subscribe 时关闭本模块
+
+[General]
+use-local-host-item-for-proxy = true
+
+[Host]
+# 优先匹配 mac 的 Tailscale IP，其他 *.kerwin.cloud 均指向 NAS
+mac.kerwin.cloud = 100.121.154.2
+kerwin.cloud = 192.168.31.209
+*.kerwin.cloud = 192.168.31.209
